@@ -5,7 +5,7 @@ dotenv.config();
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/chat-app', {
+    const conn = await mongoose.connect(process.env.MONGODB_URI || 'mongodb+srv://mishrakumarharsh987_db_user:cFbgGg19UpcQkYpT@edulearncluster.nnc9ktt.mongodb.net/Chatapp?retryWrites=true&w=majority', {
       // Note: Mongoose 7+ doesn't need useNewUrlParser or useUnifiedTopology
       // These options are now enabled by default and cause errors if included
       serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
