@@ -1,3 +1,4 @@
+// app.js
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -16,33 +17,63 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
-// In your backend index.js
+// CORS configuration - Allow both local development and deployed frontend
+const allowedOrigins = [
+  'https://chatapp-frontend-79jv.onrender.com', // Your deployed frontend
+  'http://localhost:3000', // Local development
+  process.env.CORS_ORIGIN // From environment variable if set
+].filter(Boolean); // Remove any undefined/null values
+
+// Socket.IO configuration with CORS
 const io = socketIo(server, {
   cors: {
-    origin: process.env.CORS_ORIGIN || "http://localhost:3000",
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.indexOf(origin) === -1) {
+        const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
+        return callback(new Error(msg), false);
+      }
+      return callback(null, true);
+    },
     credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization"]
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
   },
   pingTimeout: 60000,
   pingInterval: 25000,
   transports: ['websocket', 'polling'],
-  allowEIO3: true, // Add this for compatibility
+  allowEIO3: true,
   connectionStateRecovery: {
     maxDisconnectionDuration: 2 * 60 * 1000,
     skipMiddlewares: true,
   }
 });
 
-// Update CORS middleware
+// Express CORS middleware - simplified version
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
+// REMOVE THIS LINE - it's causing the error
+// app.options('*', cors());
+
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Routes
 app.use('/api', apiRoutes);
@@ -52,6 +83,8 @@ app.get('/', (req, res) => {
   res.json({ 
     message: 'Chat API Server is running',
     version: '1.0.0',
+    frontendUrl: 'https://chatapp-frontend-79jv.onrender.com',
+    allowedOrigins: allowedOrigins,
     endpoints: {
       health: '/api/health',
       users: {
@@ -71,6 +104,16 @@ app.get('/', (req, res) => {
   });
 });
 
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
 // Connect to MongoDB
 connectDB();
 
@@ -81,7 +124,7 @@ const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🌐 CORS enabled for: ${process.env.CORS_ORIGIN || "http://localhost:3000"}`);
+  console.log(`🌐 CORS enabled for: ${allowedOrigins.join(', ')}`);
   console.log(`📊 MongoDB connected`);
   console.log(`🔌 Socket.IO ready for connections`);
 });
